@@ -1,0 +1,33 @@
+<script>
+/* 空き計算。予約が重ならないかの判定と、近い順の空き探し */
+function itemsOf(date){ return (state.days[date] || []).slice().sort((a,b) => toMin(a.start)-toMin(b.start)); }
+function isFree(date, staff, start, dur, ignoreId){
+  const h = hoursOf(date); if (!h) return false;
+  if (start < h[0]*60 || start + dur > h[1]*60) return false;
+  return !itemsOf(date).some(b => b.staff === staff && b.id !== ignoreId &&
+    start < toMin(b.start) + b.dur && toMin(b.start) < start + dur);
+}
+function freeRunFrom(date, staff, start, ignoreId){
+  const h = hoursOf(date); if (!h) return 0;
+  let end = h[1]*60;
+  itemsOf(date).forEach(b => { if (b.staff===staff && b.id!==ignoreId && toMin(b.start) >= start) end = Math.min(end, toMin(b.start)); });
+  return Math.max(0, end - start);
+}
+function findOpenings(staffId, dur, limit=12){
+  const out = []; const now = new Date(); const nowMin = now.getHours()*60 + now.getMinutes();
+  let d = ymd(now);
+  for (let i=0; i<60 && out.length<limit; i++, d = addDays(d,1)){
+    const h = hoursOf(d); if (!h) continue;
+    for (let t=h[0]*60; t+dur<=h[1]*60 && out.length<limit; t+=CONFIG.step){
+      if (i===0 && t < nowMin) continue;
+      const staffList = staffId ? S.staff.filter(s => s.id===staffId) : S.staff;
+      const s = staffList.find(s => isFree(d, s.id, t, dur));
+      if (s) out.push({ date:d, start:t, staff:s.id });
+    }
+  }
+  return out;
+}
+const staffName = id => (S.staff.find(s => s.id===id) || {name:"（削除済み）"}).name;
+const staffColor = id => ((S.staff.find(s => s.id===id) || {color:0}).color || 0) % COLORS;
+const colorStyle = c => `background:var(--s${c}-bg);border-left-color:var(--s${c})`;
+</script>

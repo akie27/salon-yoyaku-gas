@@ -1,0 +1,32 @@
+<script>
+/* ボタンと処理をつないで、アプリを起動する。最後に読み込まれます */
+$("veil").onclick = closeSheet;
+$("sheet").addEventListener("click", e => { if (e.target.closest('[data-act="close"]')) closeSheet(); });
+$("prev").onclick = () => { state.date = addDays(state.date,-1); render(); };
+$("next").onclick = () => { state.date = addDays(state.date, 1); render(); };
+$("today").onclick = () => { state.date = ymd(new Date()); render(); };
+$("find").onclick = openFinder;
+$("settings").onclick = openSettings;
+$("placecancel").onclick = () => { state.placing = null; render(); };
+$("week").onclick = e => { const b = e.target.closest("[data-d]"); if (b){ state.date = b.dataset.d; render(); } };
+$("board").onclick = e => {
+  const slot = e.target.closest(".slot"); const bk = e.target.closest(".bk");
+  if (slot){
+    const staff = slot.dataset.staff, t = Number(slot.dataset.t);
+    const p = state.placing;
+    if (p){
+      if (!isFree(state.date, staff, t, p.dur, p.moveId)){ toast(`${p.dur}分入る空きがありません`); return; }
+      const draft = { date: state.date, staff, start: t, name: p.name, menus: p.menus, dur: p.dur, memo: p.memo || "" };
+      if (p.moveId) saveBooking(draft, { id: p.moveId, date: p.moveDate });
+      else openNew(state.date, staff, t, draft);
+      return;
+    }
+    openNew(state.date, staff, t);
+  } else if (bk && !state.placing){ openDetail(bk.dataset.id); }
+};
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
+setInterval(() => { if (state.date === ymd(new Date()) && !$("sheet").classList.contains("on")) render(); }, 60000);
+
+render();
+connect();
+</script>

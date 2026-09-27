@@ -1,0 +1,38 @@
+<script>
+/* 予約をタップしたときの詳細（次回予約・移動・取り消し） */
+function openDetail(id){
+  const b = itemsOf(state.date).find(x => x.id===id); if (!b) return;
+  const end = toMin(b.start)+b.dur;
+  openSheet(`
+    <div class="sh-title"><h2>${esc(b.name)}様</h2><button class="x" data-act="close" aria-label="閉じる">×</button></div>
+    <div class="facts">
+      <p>${jpDate(state.date)}　${b.start}〜${hm(end)}（${b.dur}分）</p>
+      <p>担当：${esc(staffName(b.staff))}</p>
+      <p>${esc((b.menus||[]).join("・")) || "メニュー未選択"}</p>
+      ${b.memo ? `<p>メモ：${esc(b.memo)}</p>` : ""}
+    </div>
+    <div class="lbl">次回の予約を取る</div>
+    <div class="chips" id="nextw">${[3,4,5,6,8].map(n=>`<button class="chip" data-w="${n}">${n}週間後<small>${jpDate(addDays(state.date,n*7))}</small></button>`).join("")}</div>
+    <button class="sec" id="move">この予約の時間を変える</button>
+    <button class="sec danger" id="del">この予約を取り消す</button>`);
+  $("nextw").onclick = e => {
+    const x = e.target.closest("[data-w]"); if (!x) return;
+    let d = addDays(state.date, Number(x.dataset.w)*7); let guard = 0;
+    while (!hoursOf(d) && guard++ < 7) d = addDays(d,1);
+    state.placing = { name:b.name, menus:[...(b.menus||[])], dur:b.dur, memo:"", staff:b.staff };
+    state.date = d; closeSheet(); render(); window.scrollTo({top:0});
+  };
+  $("move").onclick = () => {
+    state.placing = { name:b.name, menus:[...(b.menus||[])], dur:b.dur, memo:b.memo, staff:b.staff, moveId:b.id, moveDate:state.date };
+    closeSheet(); render();
+  };
+  $("del").onclick = () => {
+    const btn = $("del");
+    if (btn.dataset.sure !== "1"){ btn.dataset.sure = "1"; btn.textContent = "本当に取り消す（もう一度押す）"; return; }
+    btn.disabled = true; btn.textContent = "取り消しています…";
+    store.cancelBooking(b.id)
+      .then(() => { closeSheet(); toast(`${b.name}様の予約を取り消しました`); })
+      .catch(err => { btn.disabled = false; btn.textContent = "本当に取り消す（もう一度押す）"; toast(err.message || "取り消せませんでした。もう一度押してください。"); });
+  };
+}
+</script>

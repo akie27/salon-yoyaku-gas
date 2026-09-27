@@ -1,0 +1,73 @@
+<script>
+/* 週の帯と予約表を描く */
+function render(){
+  const date = state.date; const h = hoursOf(date);
+  $("bigdate").innerHTML = `${parse(date).getMonth()+1}月${parse(date).getDate()}日<small>（${WD[parse(date).getDay()]}）</small>`;
+  $("mode").textContent = {loading:"読み込み中…", ready:"スプレッドシートに保存", offline:"つながっていません（電波を確認）", error:"読み込めませんでした。再読み込みしてください"}[state.mode];
+  $("board").style.pointerEvents = state.mode === "loading" ? "none" : "";
+  store.ensureRange(date);
+
+  // 週
+  const d0 = parse(date); const mon = addDays(date, -((d0.getDay()+6)%7));
+  const today = ymd(new Date());
+  let w = "";
+  for (let i=0;i<7;i++){
+    const d = addDays(mon,i); const hh = hoursOf(d); const its = state.days[d] || [];
+    const cap = hh ? (hh[1]-hh[0])*60*S.staff.length : 0;
+    const used = its.reduce((a,b)=>a+b.dur,0);
+    const pct = cap ? Math.min(100, Math.round(used/cap*100)) : 0;
+    const dd = parse(d);
+    w += `<button class="wd ${d===date?"sel":""} ${hh?"":"closed"} ${dd.getDay()===0?"sun":""} ${d===today?"istoday":""}" data-d="${d}"
+      aria-label="${jpDate(d)} ${hh?`予約${its.length}件`:"定休日"}">
+      <span class="dw">${WD[dd.getDay()]}</span><span class="dn">${dd.getDate()}</span>
+      ${hh ? `<span class="meter"><i style="width:${pct}%"></i></span><span class="cap">${its.length}件</span>` : `<span class="cap" style="display:block">定休</span>`}
+    </button>`;
+  }
+  $("week").innerHTML = w;
+
+  // 置く場所バー
+  const p = state.placing;
+  $("placebar").classList.toggle("on", !!p);
+  if (p) $("placetext").textContent = `${p.name}様（${p.menus.join("・")||"メニュー未選択"}／${p.dur}分）を入れる枠をタップしてください`;
+
+  // 予約表
+  const board = $("board");
+  board.classList.toggle("placing", !!p);
+  if (!h){ board.innerHTML = `<div class="closedmsg">水曜日は定休日です</div>`; $("hint").textContent=""; return; }
+  const cols = `64px repeat(${S.staff.length}, minmax(130px, 1fr))`;
+  const rows = (h[1]-h[0])*60/CONFIG.step;
+  let html = `<div class="scroller"><div style="min-width:${64 + S.staff.length*130}px"><div class="heads" style="grid-template-columns:${cols}"><div></div>${S.staff.map(s=>`<div style="color:var(--s${s.color%COLORS})">${esc(s.name)}</div>`).join("")}</div>`;
+  html += `<div class="grid" style="grid-template-columns:${cols};--row:${ROW}px">`;
+  html += `<div class="times">`;
+  for (let r=0;r<rows;r++){ const t = h[0]*60 + r*CONFIG.step; html += `<div class="${t%60===0?"hour":""}">${t%60===0?hm(t):""}</div>`; }
+  html += `</div>`;
+  const items = itemsOf(date);
+  S.staff.forEach(s => {
+    html += `<div class="col" style="height:${rows*ROW}px">`;
+    for (let r=0;r<rows;r++){
+      const t = h[0]*60 + r*CONFIG.step;
+      const covered = items.some(b => b.staff===s.id && (!p || b.id!==p.moveId) && t>=toMin(b.start) && t<toMin(b.start)+b.dur);
+      if (covered) continue;
+      const fits = p ? isFree(date, s.id, t, p.dur, p.moveId) : true;
+      html += `<button class="slot ${t%60?"half":""} ${fits?"":"nofit"}" style="top:${r*ROW}px;height:${ROW}px" data-staff="${s.id}" data-t="${t}"
+        aria-label="${s.name} ${hm(t)} 空き">${p ? (fits ? "ここに入れる" : "") : "＋ " + hm(t)}</button>`;
+    }
+    items.filter(b => b.staff===s.id).forEach(b => {
+      const top = (toMin(b.start) - h[0]*60)/CONFIG.step*ROW; const ht = b.dur/CONFIG.step*ROW;
+      const end = toMin(b.start)+b.dur;
+      html += `<button class="bk ${p&&p.moveId===b.id?"moving":""}" style="top:${top+2}px;height:${ht-4}px;${colorStyle(staffColor(s.id))}" data-id="${b.id}"
+        aria-label="${esc(b.name)}様 ${b.start}から${hm(end)}">
+        <b>${esc(b.name)}様</b><span>${b.start}〜${hm(end)}　${esc((b.menus||[]).join("・"))}</span>${b.memo?`<span>${esc(b.memo)}</span>`:""}</button>`;
+    });
+    html += `</div>`;
+  });
+  // 現在時刻
+  if (date === today){
+    const n = new Date(); const nm = n.getHours()*60+n.getMinutes();
+    if (nm >= h[0]*60 && nm <= h[1]*60) html += `<div class="nowline" style="top:${(nm-h[0]*60)/CONFIG.step*ROW}px;grid-column:1/-1"></div>`;
+  }
+  html += `</div></div></div>`;
+  board.innerHTML = html;
+  $("hint").textContent = p ? "" : (items.length ? "予約をタップすると、次回の予約・移動・取り消しができます。" : "空いている枠をタップすると予約を入れられます。");
+}
+</script>

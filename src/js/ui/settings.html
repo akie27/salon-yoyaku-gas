@@ -1,0 +1,136 @@
+<script>
+/* 担当者・メニューの設定（追加・削除・名前変更・ドラッグで並べ替え） */
+function futureCount(staffId){
+  const today = ymd(new Date()); let n = 0;
+  Object.keys(state.days).forEach(d => { if (d >= today) n += state.days[d].filter(b => b.staff === staffId).length; });
+  return n;
+}
+function openSettings(){
+  const draft = { staff: S.staff.map(x => ({...x})), menus: S.menus.map(x => ({...x})) };
+  let sure = null; // 削除の確認中の行
+  const draw = (msg="") => {
+    openSheet(`
+      <div class="sh-title"><h2>担当者・メニューの設定</h2><button class="x" data-act="close" aria-label="閉じる">×</button></div>
+      <div class="lbl">担当者（≡ をつかんで上下に動かすと順番が変わります。上から順に左の列に並びます）</div>
+      ${draft.staff.map((s,i) => `<div class="setrow staffrow">
+        <button class="grip" data-a="drag" data-i="${i}" aria-label="${esc(s.name||"担当者")}の順番を変える（上下の矢印キーでも動かせます）">≡</button>
+        <button class="swatch" style="background:var(--s${s.color%COLORS})" data-a="color" data-i="${i}" aria-label="色を変える"></button>
+        <input class="field" data-a="sname" data-i="${i}" value="${esc(s.name)}" placeholder="名前" aria-label="担当者の名前">
+        <button class="ib danger" data-a="sdel" data-i="${i}">${sure==="s"+i ? "本当に削除" : "削除"}</button>
+      </div>`).join("")}
+      <button class="add" data-a="sadd">＋ 担当者を追加</button>
+
+      <div class="lbl">メニューとかかる時間</div>
+      ${draft.menus.map((m,i) => `<div class="setrow menurow">
+        <input class="field" data-a="mname" data-i="${i}" value="${esc(m.name)}" placeholder="メニュー名" aria-label="メニュー名">
+        <div class="mins">
+          <button class="ib" data-a="mminus" data-i="${i}" aria-label="30分へらす">−</button>
+          <output>${m.min}分</output>
+          <button class="ib" data-a="mplus" data-i="${i}" aria-label="30分ふやす">＋</button>
+        </div>
+        <button class="ib danger" data-a="mdel" data-i="${i}">${sure==="m"+i ? "本当に削除" : "削除"}</button>
+      </div>`).join("")}
+      <button class="add" data-a="madd">＋ メニューを追加</button>
+
+      <p class="warn" id="warn">${esc(msg)}</p>
+      <button class="main" id="ssave">設定を保存する</button>
+      <button class="sec" data-act="close">保存しないで閉じる</button>`);
+    box.oninput = onInput; box.onclick = onClick; // openSheet が外すので付け直す
+    box.onpointerdown = onDown; box.onkeydown = onKey;
+  };
+  const box = $("sheetin");
+  const onInput = e => {
+    const t = e.target, i = Number(t.dataset.i);
+    if (t.dataset.a === "sname") draft.staff[i].name = t.value;
+    if (t.dataset.a === "mname") draft.menus[i].name = t.value;
+  };
+  const onClick = e => {
+    if (e.target.id === "ssave") return saveAll(e.target);
+    const b = e.target.closest("[data-a]"); if (!b || b.dataset.a === "drag") return;
+    const a = b.dataset.a, i = Number(b.dataset.i); let msg = "";
+    const keepScroll = $("sheet").scrollTop;
+    if (a !== "sdel" && a !== "mdel") sure = null;
+    if (a === "color") draft.staff[i].color = (draft.staff[i].color + 1) % COLORS;
+    if (a === "sadd"){
+      const used = draft.staff.map(s => s.color);
+      const color = [...Array(COLORS).keys()].find(c => !used.includes(c)) ?? draft.staff.length % COLORS;
+      draft.staff.push({ id: "st" + uid(), name: "", color });
+    }
+    if (a === "sdel"){
+      const s = draft.staff[i]; const n = futureCount(s.id);
+      if (draft.staff.length === 1) msg = "担当者は1人以上必要です。";
+      else if (n > 0) msg = `${s.name || "この担当者"}さんには今日以降の予約が${n}件あります。先に予約を移動するか取り消してから削除してください。`;
+      else if (sure !== "s"+i) sure = "s"+i;
+      else { draft.staff.splice(i,1); sure = null; }
+    }
+    if (a === "madd") draft.menus.push({ name: "", min: 60 });
+    if (a === "mminus") draft.menus[i].min = Math.max(CONFIG.step, draft.menus[i].min - CONFIG.step);
+    if (a === "mplus") draft.menus[i].min += CONFIG.step;
+    if (a === "mdel"){ if (sure !== "m"+i) sure = "m"+i; else { draft.menus.splice(i,1); sure = null; } }
+    draw(msg);
+    requestAnimationFrame(() => {
+      $("sheet").scrollTop = keepScroll;
+      if (a === "sadd" || a === "madd"){ const f = box.querySelectorAll(a==="sadd" ? '[data-a="sname"]' : '[data-a="mname"]'); f[f.length-1]?.focus(); }
+    });
+  };
+  // ドラッグで並べ替え（指でもマウスでも動くように pointer イベントを使う）
+  const redrawKeep = () => { const keep = $("sheet").scrollTop; draw(); requestAnimationFrame(() => $("sheet").scrollTop = keep); };
+  const onDown = e => {
+    const h = e.target.closest('[data-a="drag"]'); if (!h) return;
+    e.preventDefault();
+    const rows = [...box.querySelectorAll(".staffrow")];
+    const from = Number(h.dataset.i), row = rows[from];
+    const tops = rows.map(r => r.getBoundingClientRect().top);
+    const step = rows.length > 1 ? tops[1] - tops[0] : row.offsetHeight + 8; // 1行分の高さ
+    const startY = e.clientY; let to = from;
+    h.setPointerCapture(e.pointerId);
+    row.classList.add("dragging");
+    h.onpointermove = ev => {
+      const dy = ev.clientY - startY;
+      row.style.transform = `translateY(${dy}px)`;
+      to = Math.max(0, Math.min(rows.length - 1, from + Math.round(dy / step)));
+      // ほかの行を1行ずつずらして「ここに入る」を見せる
+      rows.forEach((r, j) => {
+        if (j === from) return;
+        let off = 0;
+        if (from < to && j > from && j <= to) off = -step;
+        if (from > to && j < from && j >= to) off = step;
+        r.style.transform = off ? `translateY(${off}px)` : "";
+      });
+    };
+    h.onpointerup = h.onpointercancel = () => {
+      h.onpointermove = h.onpointerup = h.onpointercancel = null;
+      if (to !== from){ const [it] = draft.staff.splice(from, 1); draft.staff.splice(to, 0, it); }
+      sure = null; redrawKeep();
+    };
+  };
+  // キーボードでも並べ替えられるように（↑↓）
+  const onKey = e => {
+    const h = e.target.closest && e.target.closest('[data-a="drag"]');
+    if (!h || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+    e.preventDefault();
+    const i = Number(h.dataset.i), j = e.key === "ArrowUp" ? i - 1 : i + 1;
+    if (j < 0 || j >= draft.staff.length) return;
+    [draft.staff[i], draft.staff[j]] = [draft.staff[j], draft.staff[i]];
+    sure = null; redrawKeep();
+    requestAnimationFrame(() => box.querySelector(`[data-a="drag"][data-i="${j}"]`)?.focus());
+  };
+
+  const saveAll = async btn => {
+    const staff = draft.staff.map(s => ({ ...s, name: s.name.trim() }));
+    const menus = draft.menus.map(m => ({ ...m, name: m.name.trim() })).filter(m => m.name);
+    if (staff.some(s => !s.name)){ $("warn").textContent = "名前が空の担当者がいます。入力するか削除してください。"; return; }
+    const names = menus.map(m => m.name);
+    if (new Set(names).size !== names.length){ $("warn").textContent = "同じ名前のメニューが2つあります。"; return; }
+    btn.disabled = true; btn.textContent = "保存しています…";
+    try {
+      await store.saveSettings({ staff, menus });
+      applySettings({ staff, menus }); closeSheet(); render(); toast("設定を保存しました");
+    } catch(err){
+      btn.disabled = false; btn.textContent = "設定を保存する";
+      $("warn").textContent = err.message || "保存できませんでした。もう一度押してください。";
+    }
+  };
+  draw();
+}
+</script>

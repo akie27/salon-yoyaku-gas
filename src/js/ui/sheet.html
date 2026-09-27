@@ -1,0 +1,6 @@
+<script>
+/* 下から出るパネルとお知らせ（トースト）の共通部品 */
+function openSheet(html){ const b0 = $("sheetin"); b0.onclick = b0.oninput = b0.onpointerdown = b0.onkeydown = null; $("sheetin").innerHTML = `<div class="grab"></div>` + html; $("veil").classList.add("on"); $("sheet").classList.add("on"); $("sheet").scrollTop = 0; }
+function closeSheet(){ $("veil").classList.remove("on"); $("sheet").classList.remove("on"); }
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("on"),2200); }
+</script>

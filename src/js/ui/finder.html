@@ -1,0 +1,33 @@
+<script>
+/* 空きを探す */
+function openFinder(){
+  const f = { staff: "", dur: 60 };
+  openSheet(`
+    <div class="sh-title"><h2>空いている時間を探す</h2><button class="x" data-act="close" aria-label="閉じる">×</button></div>
+    <div class="lbl">担当</div>
+    <div class="chips" id="fs"><button class="chip on" data-s="">だれでも</button>${S.staff.map(s=>`<button class="chip" data-s="${s.id}">${esc(s.name)}</button>`).join("")}</div>
+    <div class="lbl">かかる時間</div>
+    <div class="chips" id="fd">${[30,60,90,120,150,180].map(m=>`<button class="chip ${m===60?"on":""}" data-m="${m}">${m>=60?`${Math.floor(m/60)}時間${m%60?"半":""}`:"30分"}</button>`).join("")}</div>
+    <div class="lbl">近い順の空き（タップで予約へ）</div>
+    <div class="open-list" id="ol"></div>`);
+  const draw = () => {
+    const list = findOpenings(f.staff, f.dur);
+    $("ol").innerHTML = list.length ? list.map(o => `<button data-d="${o.date}" data-t="${o.start}" data-s="${o.staff}">
+      <span class="od">${jpDate(o.date)}</span><span>${hm(o.start)}〜${hm(o.start+f.dur)}</span><span class="os">${esc(staffName(o.staff))}</span></button>`).join("")
+      : `<p class="empty">この先60日に、その長さの空きはありません。時間を短くしてみてください。</p>`;
+  };
+  const pick = (id, key) => $(id).onclick = e => {
+    const b = e.target.closest(`[data-${key}]`); if (!b) return;
+    $(id).querySelectorAll(".chip").forEach(c => c.classList.toggle("on", c===b));
+    if (key==="s") f.staff = b.dataset.s; else f.dur = Number(b.dataset.m);
+    draw();
+  };
+  pick("fs","s"); pick("fd","m");
+  $("ol").onclick = e => {
+    const b = e.target.closest("[data-d]"); if (!b) return;
+    state.date = b.dataset.d; render();
+    openNew(b.dataset.d, b.dataset.s, Number(b.dataset.t), { dur: f.dur });
+  };
+  draw();
+}
+</script>

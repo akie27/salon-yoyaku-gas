@@ -1,0 +1,23 @@
+<script>
+/* 画面の状態（今見ている日付・予約・設定）をまとめて持つ場所 */
+/* 担当者・メニュー。サーバー（スプレッドシート）から届いたらそちらで置き換わります */
+const COLORS = 6;
+const S = {
+  staff: CONFIG.staff.map((x,i) => ({ ...x, color: i % COLORS })),
+  menus: CONFIG.menus.map(m => ({ ...m })),
+};
+function applySettings(v){
+  if (v && Array.isArray(v.staff) && v.staff.length) S.staff = v.staff;
+  if (v && Array.isArray(v.menus)) S.menus = v.menus;
+}
+
+const state = {
+  date: ymd(new Date()),
+  days: {},        // "YYYY-MM-DD" -> [{id,staff,start,dur,name,menus,memo}]
+  customers: [],   // [{name,last,count}]
+  placing: null,   // {name,menus,dur,memo,staff,moveId,moveDate}
+  mode: "loading", // loading / ready / offline / error
+  version: "0",    // サーバーのデータの版。変わったら読み直す
+  loadedFrom: "",  // この日付以降の予約を読み込み済み
+};
+</script>

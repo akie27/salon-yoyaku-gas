@@ -1,0 +1,11 @@
+# clasp の設定（スクリプトIDが入る）
+.clasp.json
+# clasp のログイン情報（通常はホームフォルダにあるが、念のため）
+.clasprc.json
+
+# 生成物
+dev/preview.html
+
+# OS やツールが作るファイル
+.DS_Store
+node_modules/

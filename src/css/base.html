@@ -1,0 +1,12 @@
+<style>
+/* ページ全体の基本（文字・ボタン・余白） */
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;
+  font-size:18px;line-height:1.5;-webkit-tap-highlight-color:transparent;font-weight:500}
+button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--free);outline-offset:2px}
+.wrap{max-width:1100px;margin:0 auto;padding:12px 14px 40px}
+</style>

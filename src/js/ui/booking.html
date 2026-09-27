@@ -1,0 +1,87 @@
+<script>
+/* 新しい予約：① お客様を選ぶ → ② メニューと時間を選ぶ → 保存 */
+function openNew(date, staff, start, preset){
+  const draft = { date, staff, start, name: preset?.name || "", menus: preset?.menus ? [...preset.menus] : [], dur: preset?.dur || 0, memo: preset?.memo || "" };
+  if (draft.name) return stepMenu(draft);
+  stepCustomer(draft);
+}
+function stepCustomer(draft){
+  const recent = state.customers.slice(0, 18);
+  openSheet(`
+    <div class="sh-title"><h2>${jpDate(draft.date)} ${hm(draft.start)}〜<br>${esc(staffName(draft.staff))}　どなたの予約ですか？</h2><button class="x" data-act="close" aria-label="閉じる">×</button></div>
+    <div class="lbl">名前を入れる（ひらがなでも漢字でも）</div>
+    <input class="field" id="nm" autocomplete="off" placeholder="例：たなか" value="${esc(draft.name)}">
+    <div class="lbl" id="rlabel">${recent.length ? "最近のお客様" : ""}</div>
+    <div class="chips" id="cands"></div>
+    <button class="main" id="go" disabled>次へ（メニューを選ぶ）</button>`);
+  const nm = $("nm"), cands = $("cands"), go = $("go");
+  const draw = () => {
+    const q = nm.value.trim();
+    const list = q ? state.customers.filter(c => c.name.includes(q)).slice(0,18) : recent;
+    $("rlabel").textContent = q ? (list.length ? "候補" : "") : (recent.length ? "最近のお客様" : "");
+    cands.innerHTML = list.map(c => `<button class="chip" data-name="${esc(c.name)}">${esc(c.name)}様<small>来店 ${c.count||1}回</small></button>`).join("");
+    go.disabled = !q; go.textContent = q ? `「${q}」様で次へ` : "次へ（メニューを選ぶ）";
+  };
+  nm.oninput = draw; draw();
+  cands.onclick = e => { const b = e.target.closest("[data-name]"); if (!b) return; draft.name = b.dataset.name; stepMenu(draft); };
+  go.onclick = () => { draft.name = nm.value.trim(); if (draft.name) stepMenu(draft); };
+}
+function stepMenu(draft){
+  const maxRun = freeRunFrom(draft.date, draft.staff, draft.start);
+  if (!draft.dur) draft.dur = draft.menus.length ? sumMenus(draft.menus) : Math.min(60, maxRun || 60);
+  openSheet(`
+    <div class="sh-title"><h2>${esc(draft.name)}様<br>${jpDate(draft.date)} ${hm(draft.start)}〜　${esc(staffName(draft.staff))}</h2><button class="x" data-act="close" aria-label="閉じる">×</button></div>
+    <div class="lbl">メニュー（いくつでも選べます）</div>
+    <div class="chips" id="menus">${S.menus.map(m => `<button class="chip ${draft.menus.includes(m.name)?"on":""}" data-m="${esc(m.name)}" aria-pressed="${draft.menus.includes(m.name)}">${esc(m.name)}<small>${m.min}分</small></button>`).join("")}</div>
+    <div class="lbl">かかる時間</div>
+    <div class="stepper"><button id="minus" aria-label="30分へらす">−</button><output id="dur"></output><button id="plus" aria-label="30分ふやす">＋</button></div>
+    <p class="warn" id="warn"></p>
+    <div class="lbl">メモ（なくても大丈夫）</div>
+    <input class="field" id="memo" placeholder="例：前回より短め" value="${esc(draft.memo)}">
+    <button class="main" id="save">予約を入れる</button>
+    <button class="sec" id="back">お客様を選び直す</button>`);
+  const upd = () => {
+    $("dur").textContent = `${hm(draft.start)}〜${hm(draft.start+draft.dur)}（${draft.dur}分）`;
+    const ok = isFree(draft.date, draft.staff, draft.start, draft.dur);
+    $("warn").textContent = ok ? "" : (draft.start+draft.dur > hoursOf(draft.date)[1]*60 ? "閉店時間を過ぎます。時間を短くしてください。" : "次の予約と重なります。時間を短くするか、別の枠を選んでください。");
+    $("save").disabled = !ok;
+  };
+  $("menus").onclick = e => {
+    const b = e.target.closest("[data-m]"); if (!b) return;
+    const m = b.dataset.m; const i = draft.menus.indexOf(m);
+    i>=0 ? draft.menus.splice(i,1) : draft.menus.push(m);
+    b.classList.toggle("on", i<0); b.setAttribute("aria-pressed", i<0);
+    draft.dur = Math.max(CONFIG.step, sumMenus(draft.menus) || CONFIG.step); upd();
+  };
+  $("minus").onclick = () => { draft.dur = Math.max(CONFIG.step, draft.dur - CONFIG.step); upd(); };
+  $("plus").onclick = () => { draft.dur += CONFIG.step; upd(); };
+  $("memo").oninput = e => draft.memo = e.target.value;
+  $("back").onclick = () => stepCustomer(draft);
+  $("save").onclick = () => saveBooking(draft);
+  upd();
+}
+function sumMenus(names){
+  const t = names.reduce((a,n) => a + ((S.menus.find(m=>m.name===n)||{}).min||0), 0);
+  return Math.ceil(t / CONFIG.step) * CONFIG.step;
+}
+async function saveBooking(draft, moveFrom){
+  const item = { id: moveFrom ? moveFrom.id : uid(), staff: draft.staff, start: `${pad(Math.floor(draft.start/60))}:${pad(draft.start%60)}`, dur: draft.dur, name: draft.name, menus: draft.menus, memo: draft.memo || "", staffName: staffName(draft.staff) };
+  const btn = $("save"); if (btn){ btn.disabled = true; btn.textContent = "保存しています…"; }
+  try {
+    // 重なりの確認・お客様の来店回数の更新は、サーバー側（Code.js）がロックの中で行います
+    if (moveFrom){
+      toast("保存しています…");
+      await store.moveBooking(moveFrom.id, { date: draft.date, start: item.start, staff: item.staff, staffName: item.staffName });
+    } else {
+      await store.addBooking({ ...item, date: draft.date });
+    }
+    closeSheet(); state.placing = null; state.date = draft.date; render();
+    toast(moveFrom ? `${draft.name}様の予約を移動しました` : `${draft.name}様の予約を入れました`);
+  } catch(e){
+    if (btn){ btn.disabled = false; btn.textContent = "予約を入れる"; }
+    const w = $("warn"); const msg = e.message || "保存できませんでした。通信状態を確認して、もう一度押してください。";
+    if (w) w.textContent = msg; else toast(msg);
+    if (moveFrom) toast(msg);
+  }
+}
+</script>

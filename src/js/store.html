@@ -1,0 +1,77 @@
+<script>
+/* 保存の担当：Googleスプレッドシート（Apps Script のサーバー側 Code.js）とやりとりします */
+
+/**
+ * google.script.run を Promise で使えるようにする
+ *   例） const data = await gas("getData", "2026-09-01");
+ * サーバー側で throw new Error("...") すると、ここで reject され、message が画面に出せます
+ */
+const gas = (fn, ...args) => new Promise((resolve, reject) => {
+  google.script.run
+    .withSuccessHandler(resolve)
+    .withFailureHandler(err => reject({
+      message: (err && err.message) || "通信できませんでした。電波を確認して、もう一度押してください。",
+    }))
+    [fn](...args);
+});
+
+const POLL_MS = 20000;       // ほかの端末の変更を確認する間隔
+const PAST_DAYS = 28;        // 最初に読み込む過去の日数
+
+const store = {
+  busy: false,
+
+  // サーバーから届いたデータ一式を画面に反映する
+  apply(data){
+    if (!data || data.changed === false) return;
+    if (Number(data.version) < Number(state.version)) return; // 古い返事が後から届いたときは無視
+    state.version = data.version;
+    state.loadedFrom = data.from;
+    applySettings(data.settings);
+    state.customers = data.customers || [];
+    const days = {};
+    (data.bookings || []).forEach(b => { (days[b.date] = days[b.date] || []).push(b); });
+    state.days = days;
+    state.mode = "ready";
+    render();
+  },
+
+  async load(){
+    try { this.apply(await gas("getData", state.loadedFrom)); }
+    catch(e){ state.mode = "error"; render(); }
+  },
+
+  // 定期確認。保存中・画面が裏にあるときはしない
+  async poll(){
+    if (this.busy || document.hidden || state.mode === "loading" || state.mode === "error") return;
+    try { this.apply(await gas("getUpdates", state.version, state.loadedFrom)); if (state.mode === "offline"){ state.mode = "ready"; render(); } }
+    catch(e){ state.mode = "offline"; render(); }
+  },
+
+  // 書き込み系はすべてここを通す。サーバーは保存後の最新データを返すので、そのまま反映する
+  async write(fn, ...args){
+    this.busy = true;
+    try { this.apply(await gas(fn, ...args, state.loadedFrom)); }
+    finally { this.busy = false; }
+  },
+  addBooking(item){ return this.write("addBooking", item); },
+  moveBooking(id, patch){ return this.write("moveBooking", id, patch); },
+  cancelBooking(id){ return this.write("cancelBooking", id); },
+  saveSettings(v){ return this.write("saveSettings", v); },
+
+  // 読み込み済みより前の日を開いたら、その分をさかのぼって読み込む
+  async ensureRange(date){
+    if (state.mode !== "ready" || !state.loadedFrom || date >= state.loadedFrom) return;
+    state.loadedFrom = addDays(date, -PAST_DAYS);
+    await this.load();
+  },
+};
+
+function connect(){
+  state.loadedFrom = addDays(ymd(new Date()), -PAST_DAYS);
+  store.load();
+  setInterval(() => store.poll(), POLL_MS);
+  // iPad をスリープから戻したときなど、画面が表に出たらすぐ確認する
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) store.poll(); });
+}
+</script>

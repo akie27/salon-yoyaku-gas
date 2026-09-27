@@ -1,0 +1,29 @@
+<style>
+/* 色の設定。ライト／ダーク両方をここで決めます。--s0〜--s5 は担当者の6色 */
+:root{
+  --bg:#EEF0EE; --paper:#FFFFFF; --ink:#1F2429; --sub:#5E666D; --line:#D3D8D6;
+  --slot:#F7F8F7; --slot-hover:#E4EEE9; --free:#2F7A5B;
+  --s0:#35607F; --s0-bg:#DCE7EF; --s1:#7A4466; --s1-bg:#EFDFE9;
+  --s2:#4E6E3A; --s2-bg:#E2EBD9; --s3:#8A5A1F; --s3-bg:#F2E6D3; --s4:#2F6A6A; --s4-bg:#D9EAEA; --s5:#5B4A8A; --s5-bg:#E6E1F2;
+  --danger:#B23A2E; --now:#D2462F; --shadow:0 -6px 30px rgba(20,30,35,.18);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16191B; --paper:#1F2427; --ink:#ECEFEE; --sub:#A2AAAE; --line:#343B3F;
+    --slot:#1B2023; --slot-hover:#23332C; --free:#6CC19A;
+    --s0:#9CC3E0; --s0-bg:#243644; --s1:#E2A9CC; --s1-bg:#3E2837;
+    --s2:#A9D08E; --s2-bg:#2B3A24; --s3:#E7B87A; --s3-bg:#3D3020; --s4:#93CFCF; --s4-bg:#213838; --s5:#BBAAF0; --s5-bg:#302A45;
+    --danger:#F07A6C; --now:#FF7A5C; --shadow:0 -6px 30px rgba(0,0,0,.5);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#16191B; --paper:#1F2427; --ink:#ECEFEE; --sub:#A2AAAE; --line:#343B3F;
+  --slot:#1B2023; --slot-hover:#23332C; --free:#6CC19A;
+  --s0:#9CC3E0; --s0-bg:#243644; --s1:#E2A9CC; --s1-bg:#3E2837;
+    --s2:#A9D08E; --s2-bg:#2B3A24; --s3:#E7B87A; --s3-bg:#3D3020; --s4:#93CFCF; --s4-bg:#213838; --s5:#BBAAF0; --s5-bg:#302A45;
+  --danger:#F07A6C; --now:#FF7A5C; --shadow:0 -6px 30px rgba(0,0,0,.5);
+  color-scheme:dark;
+}
+</style>

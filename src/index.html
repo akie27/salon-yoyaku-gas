@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<base target="_top">
+<!-- viewport は Code.js の doGet で指定します（Apps Script では HTML に書いても効かないため） -->
+<title><?= shopName ?> 予約台帳</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap" rel="stylesheet">
+<?!= include('css/tokens'); ?>
+<?!= include('css/base'); ?>
+<?!= include('css/board'); ?>
+<?!= include('css/sheet'); ?>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="row1">
+      <div class="brand"><?= shopName ?>　予約台帳</div>
+      <div class="mode" id="mode">読み込み中</div>
+      <button class="setbtn" id="settings">担当者・メニューの設定</button>
+    </div>
+    <div class="row2">
+      <h1 class="bigdate" id="bigdate"></h1>
+      <button class="nav" id="prev" aria-label="前の日">‹</button>
+      <button class="today" id="today">今日</button>
+      <button class="nav" id="next" aria-label="次の日">›</button>
+      <button class="find" id="find">空きを探す</button>
+    </div>
+    <div class="week" id="week"></div>
+    <div class="placebar" id="placebar"><p id="placetext"></p><button id="placecancel">やめる</button></div>
+  </header>
+
+  <section class="board" id="board" aria-label="予約表"></section>
+  <p class="hint" id="hint"></p>
+</div>
+
+<div class="veil" id="veil"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true"><div class="in" id="sheetin"></div></div>
+<div class="toast" id="toast" role="status"></div>
+
+<!-- 読み込む順番が大事です（上のファイルで作ったものを下のファイルで使います） -->
+<?!= include('js/config'); ?>
+<?!= include('js/utils'); ?>
+<?!= include('js/state'); ?>
+<?!= include('js/store'); ?>
+<?!= include('js/availability'); ?>
+<?!= include('js/render'); ?>
+<?!= include('js/ui/sheet'); ?>
+<?!= include('js/ui/booking'); ?>
+<?!= include('js/ui/detail'); ?>
+<?!= include('js/ui/finder'); ?>
+<?!= include('js/ui/settings'); ?>
+<?!= include('js/main'); ?>
+</body>
+</html>

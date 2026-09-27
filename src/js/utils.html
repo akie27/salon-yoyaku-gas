@@ -1,0 +1,16 @@
+<script>
+/* 日付・時刻・文字の小さな道具。どのファイルからも使います */
+const ROW = 56; // 30分の高さ(px)
+const WD = ["日","月","火","水","木","金","土"];
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pad = n => String(n).padStart(2,"0");
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parse = s => { const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d); };
+const addDays = (s,n) => { const d = parse(s); d.setDate(d.getDate()+n); return ymd(d); };
+const hm = m => `${Math.floor(m/60)}:${pad(m%60)}`;
+const hoursOf = s => CONFIG.hours[parse(s).getDay()];
+const jpDate = s => { const d = parse(s); return `${d.getMonth()+1}月${d.getDate()}日（${WD[d.getDay()]}）`; };
+const uid = () => Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4);
+const toMin = s => { const [h,m] = s.split(":").map(Number); return h*60+m; }; // "10:30" → 630
+</script>

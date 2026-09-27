@@ -1,0 +1,60 @@
+<style>
+/* 下から出るパネル・入力部品・お知らせ */
+/* 下から出るパネル */
+.veil{position:fixed;inset:0;background:rgba(10,15,18,.45);opacity:0;pointer-events:none;transition:opacity .2s;z-index:20}
+.veil.on{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;background:var(--paper);border-radius:22px 22px 0 0;box-shadow:var(--shadow);
+  max-height:88%;overflow:auto;transform:translateY(105%);transition:transform .25s ease;padding:8px 18px calc(18px + env(safe-area-inset-bottom,0px))}
+.sheet.on{transform:none}
+@media (prefers-reduced-motion:reduce){.sheet,.veil{transition:none}}
+.sheet .in{max-width:760px;margin:0 auto}
+.grab{width:48px;height:5px;border-radius:3px;background:var(--line);margin:4px auto 10px}
+.sh-title{display:flex;align-items:flex-start;gap:10px}
+.sh-title h2{margin:0;font-size:24px;font-weight:900;flex:1;line-height:1.3}
+.x{min-width:52px;min-height:52px;border-radius:14px;border:1px solid var(--line);background:var(--paper);font-size:22px}
+.lbl{font-size:15px;color:var(--sub);margin:16px 0 8px;font-weight:700}
+.chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.chip{min-height:58px;border:1px solid var(--line);background:var(--slot);border-radius:14px;padding:6px 10px;font-weight:700;font-size:17px}
+.chip small{display:block;font-size:13px;color:var(--sub);font-weight:500}
+.chip.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.chip.on small{color:var(--paper);opacity:.8}
+.field{width:100%;min-height:58px;border:1px solid var(--line);border-radius:14px;background:var(--slot);padding:10px 14px;font:inherit;color:inherit;font-size:19px}
+textarea.field{min-height:80px;resize:vertical}
+.stepper{display:flex;align-items:center;gap:10px}
+.stepper button{min-width:64px;min-height:56px;border-radius:14px;border:1px solid var(--line);background:var(--slot);font-size:24px;font-weight:700}
+.stepper output{font-size:26px;font-weight:900;min-width:120px;text-align:center}
+.main{width:100%;min-height:64px;border:0;border-radius:16px;background:var(--ink);color:var(--paper);font-size:20px;font-weight:900;margin-top:18px}
+.main:disabled{opacity:.35;cursor:not-allowed}
+.sec{width:100%;min-height:58px;border:1px solid var(--line);border-radius:16px;background:var(--paper);font-weight:700;margin-top:10px}
+.danger{color:var(--danger);border-color:var(--danger)}
+.warn{color:var(--danger);font-weight:700;margin:10px 0 0}
+.facts{font-size:19px;margin:6px 0 0}
+.facts p{margin:4px 0}
+.open-list{display:grid;gap:8px}
+.open-list button{min-height:60px;border:1px solid var(--line);border-radius:14px;background:var(--slot);text-align:left;padding:8px 14px;display:flex;gap:14px;align-items:center;font-weight:700}
+.open-list .od{min-width:9.5em}
+.open-list .os{margin-left:auto;font-size:15px;color:var(--sub)}
+.empty{color:var(--sub)}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,40px);opacity:0;background:var(--ink);color:var(--paper);
+  padding:14px 22px;border-radius:14px;font-weight:700;z-index:30;transition:.2s;pointer-events:none;max-width:90%}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* 担当者・メニューの設定パネル */
+.setrow{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.setrow .field{flex:1;min-width:0}
+.ib{min-width:52px;min-height:58px;border-radius:14px;border:1px solid var(--line);background:var(--paper);font-weight:700;font-size:18px}
+.ib.danger{font-size:15px;padding:0 10px}
+.ib:disabled{opacity:.3}
+.swatch{min-width:52px;min-height:58px;border-radius:14px;border:3px solid var(--paper);outline:1px solid var(--line)}
+.mins{display:flex;align-items:center;gap:4px}
+.mins output{min-width:4.2em;text-align:center;font-weight:700}
+.staffrow{transition:transform .15s ease;border-radius:16px}
+.staffrow.dragging{transition:none;position:relative;z-index:2;background:var(--paper);box-shadow:0 8px 24px rgba(20,30,35,.22)}
+.grip{min-width:52px;min-height:58px;border-radius:14px;border:1px solid var(--line);background:var(--slot);font-size:24px;line-height:1;
+  touch-action:none;cursor:grab;color:var(--sub);user-select:none;-webkit-user-select:none}
+.staffrow.dragging .grip{cursor:grabbing;background:var(--ink);color:var(--paper)}
+@media (prefers-reduced-motion:reduce){.staffrow{transition:none}}
+.add{width:100%;min-height:58px;border:2px dashed var(--line);border-radius:14px;background:transparent;font-weight:700;color:var(--sub)}
+@media (max-width:640px){ .menurow{flex-wrap:wrap} .menurow .field{flex-basis:100%} }
+</style>
