@@ -22,6 +22,8 @@ const serverBlock = `(function(){\n${server}\nwindow.__gas = { ${publicFns.join(
 const shopName = (server.match(/const SHOP_NAME = '([^']*)'/) || [, "SAMPLE SALON"])[1];
 html = html.replace(/<\?=\s*shopName\s*\?>/g, shopName);
 
+// プレビューはスプレッドシートにつながっていないので、そのことがわかる表示にする
+html = html.replace('ready:"スプレッドシートに保存"', 'ready:"デモ：このブラウザだけに保存"');
 // viewport は本番では doGet で付けるので、プレビューではここで足す
 html = html.replace("<head>", `<head>\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">`);
 html = html.replace("<body>", `<body>\n<script>\n${read(join(root, "dev", "mock-gas.js")).replace(/<\/script/gi, "<\\/script")}\n</script>\n<script>\n${serverBlock.replace(/<\/script/gi, "<\\/script")}\n</script>`);
