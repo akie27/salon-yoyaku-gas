@@ -41,8 +41,7 @@ function doGet() {
   t.shopName = SHOP_NAME; // index.html の <?= shopName ?> に入る
   return t.evaluate()
     .setTitle(SHOP_NAME + ' 予約台帳')
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
-    .addMetaTag('apple-mobile-web-app-title', '予約台帳');
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
 }
 
 /** index.html の中で <?!= include('css/tokens'); ?> のように使い、別ファイルを埋め込む */
