@@ -10,12 +10,13 @@
 const SHOP_NAME = 'SAMPLE SALON';
 
 /* ---------- シートの形 ---------- */
-const SHEETS = { bookings: '予約', customers: 'お客様', staff: '担当者', menus: 'メニュー' };
+const SHEETS = { bookings: '予約', customers: 'お客様', staff: '担当者', menus: 'メニュー', hours: '営業日' };
 const HEADERS = {
   bookings:  ['ID', '日付', '開始', '分', '担当ID', '担当名', 'お客様', 'メニュー', 'メモ', '状態', '作成日時', '更新日時'],
   customers: ['名前', '来店回数', '最終予約日時'],
   staff:     ['ID', '名前', '色'],
   menus:     ['名前', '分'],
+  hours:     ['種類', '曜日・日付', '開店', '閉店', 'メモ'],
 };
 // 予約シートの列番号（1始まり）
 const COL = { id: 1, date: 2, start: 3, dur: 4, staff: 5, staffName: 6, name: 7, menus: 8, memo: 9, status: 10, created: 11, updated: 12 };
@@ -24,8 +25,14 @@ const STATUS_OK = '予約';
 const STATUS_CANCELED = '取消';   // 行は消さずに「取消」にする（あとから履歴を確認できるように）
 const TZ = Session.getScriptTimeZone();
 
-// 最初の担当者（公開用の仮の名前です。実際の名前は画面の「担当者・メニューの設定」から変えてください）
+// 最初の担当者（公開用の仮の名前です。実際の名前は画面の「お店の設定」から変えてください）
 const DEFAULT_STAFF = [['staff-a', 'スタッフA', 0], ['staff-b', 'スタッフB', 1]];
+// 曜日ごとの営業時間（最初の値）。'休み' は定休日
+const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
+const DEFAULT_HOURS = [['10:00', '19:00'], ['10:00', '20:00'], ['10:00', '20:00'], ['休み', ''],
+                       ['10:00', '20:00'], ['10:00', '20:00'], ['10:00', '20:00']]; // 日〜土
+const KIND_WEEK = '曜日';
+const KIND_CLOSED = '臨時休業';
 const DEFAULT_MENUS = [
   ['カット', 60], ['カラー', 90], ['パーマ', 120], ['縮毛矯正', 180], ['トリートメント', 30],
   ['ヘッドスパ', 30], ['シャンプーブロー', 30], ['セット', 60], ['メイク', 60],
@@ -63,13 +70,19 @@ function setup() {
   // 日付「2026-09-28」や時刻「10:30」を、スプレッドシートが勝手に日付型に変えないよう文字列扱いにする
   sheet_('bookings').getRange('B:C').setNumberFormat('@');
   sheet_('staff').getRange('A:B').setNumberFormat('@');
+  sheet_('hours').getRange('A:E').setNumberFormat('@');
+  if (sheet_('hours').getLastRow() < 2) {
+    sheet_('hours').getRange(2, 1, 7, 5).setValues(WEEKDAYS.map((w, i) => [KIND_WEEK, w, DEFAULT_HOURS[i][0], DEFAULT_HOURS[i][1], '']));
+  }
   if (sheet_('staff').getLastRow() < 2) sheet_('staff').getRange(2, 1, DEFAULT_STAFF.length, 3).setValues(DEFAULT_STAFF);
   if (sheet_('menus').getLastRow() < 2) sheet_('menus').getRange(2, 1, DEFAULT_MENUS.length, 2).setValues(DEFAULT_MENUS);
 }
 
 /** 画面を開いたとき：from（YYYY-MM-DD）以降の予約と設定をまとめて返す */
 function getData(from) {
-  if (!SpreadsheetApp.getActive().getSheetByName(SHEETS.bookings)) {
+  // シートが足りなければ作る（あとから「営業日」シートを足したときも、ここで自動で作られる）
+  const ss = SpreadsheetApp.getActive();
+  if (Object.keys(SHEETS).some(k => !ss.getSheetByName(SHEETS[k]))) {
     withLock_(setup);
   }
   return snapshot_(from);
@@ -119,7 +132,7 @@ function cancelBooking(id, from) {
   }, from);
 }
 
-/** 担当者・メニューの設定を保存する */
+/** 担当者・メニュー・営業日の設定を保存する */
 function saveSettings(v, from) {
   return withLock_(() => {
     const staff = (v.staff || []).map(s => [String(s.id), safeText_(String(s.name).trim()), Number(s.color) || 0]);
@@ -136,8 +149,17 @@ function saveSettings(v, from) {
       if (n) throw new Error(`${s.name}さんには今日以降の予約が${n}件あります。先に移動か取り消しをしてください。`);
     });
 
+    // 営業日：休みにする日・営業時間外になる時間に、すでに予約が入っていないか
+    const hours = v.hours ? cleanHours_(v.hours) : readHours_();
+    const outside = future.filter(b => !withinHours_(b, hours));
+    if (outside.length) {
+      const ex = outside.slice(0, 3).map(b => `${Number(b.date.slice(5, 7))}/${Number(b.date.slice(8))} ${b.start} ${b.name}様`).join('、');
+      throw new Error(`休みや営業時間外にする時間に予約が${outside.length}件あります（${ex}${outside.length > 3 ? ' など' : ''}）。先に移動か取り消しをしてください。`);
+    }
+
     writeRows_(sheet_('staff'), staff, 3);
     writeRows_(sheet_('menus'), menus, 2);
+    writeRows_(sheet_('hours'), hoursToRows_(hours), 5);
   }, from);
 }
 
@@ -186,7 +208,7 @@ function snapshot_(from) {
     changed: true,
     version: currentVersion_(),
     from: from,
-    settings: { staff: readStaff_(), menus: readMenus_() },
+    settings: { staff: readStaff_(), menus: readMenus_(), hours: readHours_() },
     customers: readCustomers_(),
     bookings: readBookings_(from).map(b => ({
       id: b.id, date: b.date, start: b.start, dur: b.dur, staff: b.staff, staffName: b.staffName,
@@ -235,6 +257,74 @@ function readCustomers_() {
     .sort((a, b) => b.last - a.last)
     .slice(0, 400);
 }
+
+/**
+ * 営業日を画面と同じ形で返す
+ *   week:   { 0: [10, 19], 3: null, ... }  曜日ごとの [開店, 閉店]（時。10.5 は 10:30）。null は定休日
+ *   closed: [{ date: '2026-12-31', memo: '年末年始' }, ...]  臨時休業日
+ */
+function readHours_() {
+  const week = {};
+  WEEKDAYS.forEach((w, i) => {
+    week[i] = DEFAULT_HOURS[i][0] === '休み' ? null : [hmToHour_(DEFAULT_HOURS[i][0]), hmToHour_(DEFAULT_HOURS[i][1])];
+  });
+  const closed = [];
+  values_(sheet_('hours'), 5).forEach(r => {
+    const kind = String(r[0]);
+    if (kind === KIND_WEEK) {
+      const i = WEEKDAYS.indexOf(String(r[1]));
+      if (i < 0) return;
+      const open = fmtTime_(r[2]), close = fmtTime_(r[3]);
+      week[i] = /^\d{2}:\d{2}$/.test(open) && /^\d{2}:\d{2}$/.test(close) ? [hmToHour_(open), hmToHour_(close)] : null;
+    } else if (kind === KIND_CLOSED) {
+      closed.push({ date: fmtDate_(r[1]), memo: unsafe_(r[4]) });
+    }
+  });
+  closed.sort((a, b) => (a.date < b.date ? -1 : 1));
+  return { week: week, closed: closed };
+}
+
+/** 画面から来た営業日を確認して整える。過去の臨時休業日は捨てる */
+function cleanHours_(h) {
+  const week = {};
+  for (let i = 0; i < 7; i++) {
+    const v = h.week ? h.week[i] : null;
+    if (!v) { week[i] = null; continue; }
+    const o = Number(v[0]), c = Number(v[1]);
+    if (!(o >= 5 && c <= 24 && o < c && o * 2 === Math.round(o * 2) && c * 2 === Math.round(c * 2))) {
+      throw new Error(`${WEEKDAYS[i]}曜日の営業時間が正しくありません。`);
+    }
+    week[i] = [o, c];
+  }
+  const today = today_(), seen = {};
+  const closed = (h.closed || [])
+    .map(c => ({ date: String(c.date), memo: String(c.memo || '').slice(0, 40) }))
+    .filter(c => /^\d{4}-\d{2}-\d{2}$/.test(c.date) && c.date >= today && !seen[c.date] && (seen[c.date] = true))
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+  return { week: week, closed: closed };
+}
+
+function hoursToRows_(h) {
+  const rows = WEEKDAYS.map((w, i) => h.week[i]
+    ? [KIND_WEEK, w, hourToHm_(h.week[i][0]), hourToHm_(h.week[i][1]), '']
+    : [KIND_WEEK, w, '休み', '', '']);
+  h.closed.forEach(c => rows.push([KIND_CLOSED, c.date, '', '', safeText_(c.memo)]));
+  return rows;
+}
+
+/** その日の営業時間を [開店分, 閉店分] で返す。休みなら null */
+function openMinutes_(date, h) {
+  if (h.closed.some(c => c.date === date)) return null;
+  const p = date.split('-').map(Number);
+  const w = h.week[new Date(p[0], p[1] - 1, p[2]).getDay()];
+  return w ? [w[0] * 60, w[1] * 60] : null;
+}
+function withinHours_(b, h) {
+  const m = openMinutes_(b.date, h);
+  return !!m && toMin_(b.start) >= m[0] && toMin_(b.start) + b.dur <= m[1];
+}
+function hmToHour_(hm) { return toMin_(hm) / 60; }
+function hourToHm_(h) { const m = Math.round(h * 60); return ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2); }
 
 function touchCustomer_(name) {
   const sh = sheet_('customers');
@@ -290,7 +380,10 @@ function cleanBooking_(x) {
 
 /** 同じ担当者の予約と時間が重なっていないか（ロックの中で確認するので、同時に押しても二重予約にならない） */
 function assertFree_(b, ignoreId) {
+  const open = openMinutes_(b.date, readHours_());
+  if (!open) throw new Error('この日はお休みです。別の日を選んでください。');
   const s = toMin_(b.start), e = s + b.dur;
+  if (s < open[0] || e > open[1]) throw new Error('営業時間の外です。時間を短くするか、別の枠を選んでください。');
   const hit = readBookings_(b.date).some(x =>
     x.date === b.date && x.staff === b.staff && x.id !== ignoreId &&
     s < toMin_(x.start) + x.dur && toMin_(x.start) < e);

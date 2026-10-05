@@ -18,9 +18,9 @@ function render(){
     const pct = cap ? Math.min(100, Math.round(used/cap*100)) : 0;
     const dd = parse(d);
     w += `<button class="wd ${d===date?"sel":""} ${hh?"":"closed"} ${dd.getDay()===0?"sun":""} ${d===today?"istoday":""}" data-d="${d}"
-      aria-label="${jpDate(d)} ${hh?`予約${its.length}件`:"定休日"}">
+      aria-label="${jpDate(d)} ${hh?`予約${its.length}件`:(closedOn(d)?"臨時休業":"定休日")}">
       <span class="dw">${WD[dd.getDay()]}</span><span class="dn">${dd.getDate()}</span>
-      ${hh ? `<span class="meter"><i style="width:${pct}%"></i></span><span class="cap">${its.length}件</span>` : `<span class="cap" style="display:block">定休</span>`}
+      ${hh ? `<span class="meter"><i style="width:${pct}%"></i></span><span class="cap">${its.length}件</span>` : `<span class="cap" style="display:block">${closedOn(d) ? "臨休" : "定休"}</span>`}
     </button>`;
   }
   $("week").innerHTML = w;
@@ -33,7 +33,11 @@ function render(){
   // 予約表
   const board = $("board");
   board.classList.toggle("placing", !!p);
-  if (!h){ board.innerHTML = `<div class="closedmsg">水曜日は定休日です</div>`; $("hint").textContent=""; return; }
+  if (!h){
+    const c = closedOn(date);
+    board.innerHTML = `<div class="closedmsg">${c ? `臨時休業日です${c.memo ? `（${esc(c.memo)}）` : ""}` : `${WD[parse(date).getDay()]}曜日は定休日です`}</div>`;
+    $("hint").textContent = ""; return;
+  }
   const cols = `64px repeat(${S.staff.length}, minmax(130px, 1fr))`;
   const rows = (h[1]-h[0])*60/CONFIG.step;
   let html = `<div class="scroller"><div style="min-width:${64 + S.staff.length*130}px"><div class="heads" style="grid-template-columns:${cols}"><div></div>${S.staff.map(s=>`<div style="color:var(--s${s.color%COLORS})">${esc(s.name)}</div>`).join("")}</div>`;

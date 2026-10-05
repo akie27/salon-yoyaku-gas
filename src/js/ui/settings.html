@@ -1,16 +1,42 @@
 <script>
-/* 担当者・メニューの設定（追加・削除・名前変更・ドラッグで並べ替え） */
+/* お店の設定：担当者（追加・削除・名前変更・ドラッグで並べ替え）、営業時間・定休日、臨時休業日、メニュー */
+const WEEK_ORDER = [1,2,3,4,5,6,0]; // 月曜から並べる
+const fmtH = h => `${Math.floor(h)}:${h % 1 ? "30" : "00"}`; // 10.5 → "10:30"
+
+// 新しい営業日の設定にしたとき、営業時間の外になってしまう今日以降の予約
+function hoursConflicts(hours){
+  const today = ymd(new Date()); const out = [];
+  Object.keys(state.days).filter(d => d >= today).sort().forEach(d => {
+    const h = hoursUnder(hours, d);
+    state.days[d].forEach(b => {
+      const s = toMin(b.start);
+      if (!h || s < h[0]*60 || s + b.dur > h[1]*60) out.push({ date: d, b });
+    });
+  });
+  return out;
+}
 function futureCount(staffId){
   const today = ymd(new Date()); let n = 0;
   Object.keys(state.days).forEach(d => { if (d >= today) n += state.days[d].filter(b => b.staff === staffId).length; });
   return n;
 }
 function openSettings(){
-  const draft = { staff: S.staff.map(x => ({...x})), menus: S.menus.map(x => ({...x})) };
+  const today = ymd(new Date());
+  const draft = {
+    staff: S.staff.map(x => ({...x})),
+    menus: S.menus.map(x => ({...x})),
+    hours: {
+      week: Object.fromEntries([0,1,2,3,4,5,6].map(d => [d, S.hours.week[d] ? [...S.hours.week[d]] : null])),
+      closed: S.hours.closed.filter(c => c.date >= today).map(c => ({...c})),
+    },
+    nc: { from: "", to: "", memo: "" }, // 臨時休業日の入力中の値
+  };
+  // 休みにした曜日を営業に戻すときの時間（覚えておく）
+  const lastOpen = {}; [0,1,2,3,4,5,6].forEach(d => lastOpen[d] = draft.hours.week[d] || [10, 20]);
   let sure = null; // 削除の確認中の行
   const draw = (msg="") => {
     openSheet(`
-      <div class="sh-title"><h2>担当者・メニューの設定</h2><button class="x" data-act="close" aria-label="閉じる">×</button></div>
+      <div class="sh-title"><h2>お店の設定</h2><button class="x" data-act="close" aria-label="閉じる">×</button></div>
       <div class="lbl">担当者（≡ をつかんで上下に動かすと順番が変わります。上から順に左の列に並びます）</div>
       ${draft.staff.map((s,i) => `<div class="setrow staffrow">
         <button class="grip" data-a="drag" data-i="${i}" aria-label="${esc(s.name||"担当者")}の順番を変える（上下の矢印キーでも動かせます）">≡</button>
@@ -19,6 +45,35 @@ function openSettings(){
         <button class="ib danger" data-a="sdel" data-i="${i}">${sure==="s"+i ? "本当に削除" : "削除"}</button>
       </div>`).join("")}
       <button class="add" data-a="sadd">＋ 担当者を追加</button>
+
+      <div class="lbl">営業時間と定休日（「営業」「休み」をタップで切り替え）</div>
+      ${WEEK_ORDER.map(d => { const h = draft.hours.week[d]; return `<div class="dayrow">
+        <span class="dname ${d===0?"sun":""}">${WD[d]}</span>
+        <button class="chip daytoggle ${h?"on":""}" data-a="dtoggle" data-d="${d}" aria-pressed="${!!h}">${h ? "営業" : "休み"}</button>
+        ${h ? `<div class="tm">
+            <button class="ib" data-a="ht" data-d="${d}" data-k="0" data-dir="-1" aria-label="${WD[d]}曜の開店を30分早く">−</button>
+            <output>${fmtH(h[0])}</output>
+            <button class="ib" data-a="ht" data-d="${d}" data-k="0" data-dir="1" aria-label="${WD[d]}曜の開店を30分遅く">＋</button>
+          </div>
+          <span class="tilde">〜</span>
+          <div class="tm">
+            <button class="ib" data-a="ht" data-d="${d}" data-k="1" data-dir="-1" aria-label="${WD[d]}曜の閉店を30分早く">−</button>
+            <output>${fmtH(h[1])}</output>
+            <button class="ib" data-a="ht" data-d="${d}" data-k="1" data-dir="1" aria-label="${WD[d]}曜の閉店を30分遅く">＋</button>
+          </div>` : ""}
+      </div>`; }).join("")}
+
+      <div class="lbl">臨時休業日（年末年始・研修など）</div>
+      ${draft.hours.closed.length ? draft.hours.closed.map((c,i) => `<div class="setrow">
+        <div class="field" style="display:flex;align-items:center">${jpDate(c.date)}${c.memo ? `　<span style="color:var(--sub)">${esc(c.memo)}</span>` : ""}</div>
+        <button class="ib danger" data-a="cdel" data-i="${i}">削除</button>
+      </div>`).join("") : `<p class="empty" style="margin:4px 0 8px">今のところありません</p>`}
+      <div class="closedadd">
+        <div><label for="cfrom">休みの日</label><input class="field" type="date" id="cfrom" data-a="cfrom" min="${today}" value="${esc(draft.nc.from)}"></div>
+        <div><label for="cto">〜 最後の日（連休のとき）</label><input class="field" type="date" id="cto" data-a="cto" min="${today}" value="${esc(draft.nc.to)}"></div>
+        <div class="full"><label for="cmemo">メモ（なくても大丈夫）</label><input class="field" id="cmemo" data-a="cmemo" placeholder="例：年末年始" value="${esc(draft.nc.memo)}"></div>
+        <button class="add full" data-a="cadd">＋ 臨時休業日を追加</button>
+      </div>
 
       <div class="lbl">メニューとかかる時間</div>
       ${draft.menus.map((m,i) => `<div class="setrow menurow">
@@ -43,10 +98,15 @@ function openSettings(){
     const t = e.target, i = Number(t.dataset.i);
     if (t.dataset.a === "sname") draft.staff[i].name = t.value;
     if (t.dataset.a === "mname") draft.menus[i].name = t.value;
+    if (t.dataset.a === "cfrom") draft.nc.from = t.value;
+    if (t.dataset.a === "cto") draft.nc.to = t.value;
+    if (t.dataset.a === "cmemo") draft.nc.memo = t.value;
   };
   const onClick = e => {
     if (e.target.id === "ssave") return saveAll(e.target);
-    const b = e.target.closest("[data-a]"); if (!b || b.dataset.a === "drag") return;
+    const b = e.target.closest("[data-a]");
+    // 入力欄をタップしただけのときは描き直さない（描き直すとキーボードや日付選択が閉じてしまう）
+    if (!b || b.dataset.a === "drag" || b.tagName === "INPUT") return;
     const a = b.dataset.a, i = Number(b.dataset.i); let msg = "";
     const keepScroll = $("sheet").scrollTop;
     if (a !== "sdel" && a !== "mdel") sure = null;
@@ -63,6 +123,33 @@ function openSettings(){
       else if (sure !== "s"+i) sure = "s"+i;
       else { draft.staff.splice(i,1); sure = null; }
     }
+    if (a === "dtoggle"){
+      const d = Number(b.dataset.d), h = draft.hours.week[d];
+      if (h){ lastOpen[d] = h; draft.hours.week[d] = null; } else draft.hours.week[d] = [...lastOpen[d]];
+    }
+    if (a === "ht"){
+      const d = Number(b.dataset.d), k = Number(b.dataset.k), h = draft.hours.week[d];
+      const v = h[k] + Number(b.dataset.dir) * 0.5;
+      // 開店は 5:00〜、閉店は 〜24:00。開店と閉店のあいだは最低1時間
+      if (k === 0 && v >= 5 && v <= h[1] - 1) h[0] = v;
+      if (k === 1 && v <= 24 && v >= h[0] + 1) h[1] = v;
+    }
+    if (a === "cadd"){
+      const { from, memo } = draft.nc; const to = draft.nc.to || from;
+      if (!from) msg = "休みの日を選んでください。";
+      else if (from < today) msg = "過去の日は追加できません。";
+      else if (to < from) msg = "最後の日は、休みの日より後にしてください。";
+      else {
+        let d = from, n = 0;
+        while (d <= to && n < 62){
+          if (!draft.hours.closed.some(c => c.date === d)) draft.hours.closed.push({ date: d, memo: memo.trim() });
+          d = addDays(d, 1); n++;
+        }
+        draft.hours.closed.sort((x, y) => x.date < y.date ? -1 : 1);
+        draft.nc = { from: "", to: "", memo: "" };
+      }
+    }
+    if (a === "cdel") draft.hours.closed.splice(i, 1);
     if (a === "madd") draft.menus.push({ name: "", min: 60 });
     if (a === "mminus") draft.menus[i].min = Math.max(CONFIG.step, draft.menus[i].min - CONFIG.step);
     if (a === "mplus") draft.menus[i].min += CONFIG.step;
@@ -122,10 +209,19 @@ function openSettings(){
     if (staff.some(s => !s.name)){ $("warn").textContent = "名前が空の担当者がいます。入力するか削除してください。"; return; }
     const names = menus.map(m => m.name);
     if (new Set(names).size !== names.length){ $("warn").textContent = "同じ名前のメニューが2つあります。"; return; }
+    const hours = draft.hours;
+    // 休みにする日・時間に予約が残っていないか（最終確認はサーバーでも行います）
+    const bad = hoursConflicts(hours);
+    if (bad.length){
+      const ex = bad.slice(0, 3).map(x => `${jpDate(x.date)} ${x.b.start} ${x.b.name}様`).join("、");
+      $("warn").textContent = `休みや営業時間外にする時間に予約が${bad.length}件あります（${ex}${bad.length > 3 ? " など" : ""}）。先に移動か取り消しをしてください。`;
+      return;
+    }
+    if (draft.nc.from){ $("warn").textContent = "臨時休業日が入力途中です。「＋ 臨時休業日を追加」を押すか、日付を消してください。"; return; }
     btn.disabled = true; btn.textContent = "保存しています…";
     try {
-      await store.saveSettings({ staff, menus });
-      applySettings({ staff, menus }); closeSheet(); render(); toast("設定を保存しました");
+      await store.saveSettings({ staff, menus, hours });
+      applySettings({ staff, menus, hours }); closeSheet(); render(); toast("設定を保存しました");
     } catch(err){
       btn.disabled = false; btn.textContent = "設定を保存する";
       $("warn").textContent = err.message || "保存できませんでした。もう一度押してください。";

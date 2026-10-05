@@ -57,4 +57,17 @@ textarea.field{min-height:80px;resize:vertical}
 @media (prefers-reduced-motion:reduce){.staffrow{transition:none}}
 .add{width:100%;min-height:58px;border:2px dashed var(--line);border-radius:14px;background:transparent;font-weight:700;color:var(--sub)}
 @media (max-width:640px){ .menurow{flex-wrap:wrap} .menurow .field{flex-basis:100%} }
+
+/* 営業日の設定 */
+.dayrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;padding:6px 0;border-bottom:1px solid var(--line)}
+.dname{min-width:2em;font-size:22px;font-weight:900;text-align:center}
+.dname.sun{color:var(--danger)}
+.daytoggle{min-width:96px;min-height:58px}
+.tm{display:flex;align-items:center;gap:4px}
+.tm output{min-width:3.4em;text-align:center;font-weight:700;font-size:19px}
+.tilde{color:var(--sub);font-weight:700}
+.closedadd{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.closedadd .full{grid-column:1/-1}
+.closedadd label{font-size:14px;color:var(--sub);font-weight:700;display:block;margin-bottom:4px}
+@media (max-width:640px){ .closedadd{grid-template-columns:1fr} }
 </style>

@@ -5,10 +5,12 @@ const COLORS = 6;
 const S = {
   staff: CONFIG.staff.map((x,i) => ({ ...x, color: i % COLORS })),
   menus: CONFIG.menus.map(m => ({ ...m })),
+  hours: { week: { ...CONFIG.hours }, closed: [] }, // 曜日ごとの営業時間と臨時休業日
 };
 function applySettings(v){
   if (v && Array.isArray(v.staff) && v.staff.length) S.staff = v.staff;
   if (v && Array.isArray(v.menus)) S.menus = v.menus;
+  if (v && v.hours && v.hours.week) S.hours = { week: v.hours.week, closed: v.hours.closed || [] };
 }
 
 const state = {

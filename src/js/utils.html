@@ -9,7 +9,10 @@ const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
 const parse = s => { const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d); };
 const addDays = (s,n) => { const d = parse(s); d.setDate(d.getDate()+n); return ymd(d); };
 const hm = m => `${Math.floor(m/60)}:${pad(m%60)}`;
-const hoursOf = s => CONFIG.hours[parse(s).getDay()];
+// 営業時間。[開店, 閉店]（時。10.5 は 10:30）を返す。休みなら null
+const hoursUnder = (hours, s) => hours.closed.some(c => c.date === s) ? null : (hours.week[parse(s).getDay()] || null);
+const hoursOf = s => hoursUnder(S.hours, s);
+const closedOn = s => S.hours.closed.find(c => c.date === s) || null; // 臨時休業ならその情報
 const jpDate = s => { const d = parse(s); return `${d.getMonth()+1}月${d.getDate()}日（${WD[d.getDay()]}）`; };
 const uid = () => Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4);
 const toMin = s => { const [h,m] = s.split(":").map(Number); return h*60+m; }; // "10:30" → 630
